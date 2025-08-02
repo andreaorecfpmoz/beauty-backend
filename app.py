@@ -7,12 +7,12 @@ import os
 
 # Inicijalizacija Flask aplikacije
 app = Flask(__name__)
-CORS(app)  # ✅ Dozvoli CORS
+CORS(app)
 
-# ➤ Konfiguracija iz environment varijabli (preporučeno za sigurnost)
-EMAIL_FROM = os.environ.get("EMAIL_FROM")  # npr. beautyrenea@gmail.com
-EMAIL_PASS = os.environ.get("EMAIL_PASS")  # Gmail App Password
-EMAIL_TO   = os.environ.get("EMAIL_TO")    # isti kao FROM ili neki drugi
+# ➤ Konfiguracija iz environment varijabli
+EMAIL_FROM = os.environ.get("EMAIL_FROM")
+EMAIL_PASS = os.environ.get("EMAIL_PASS")
+EMAIL_TO   = os.environ.get("EMAIL_TO")
 MONGO_URI  = os.environ.get("MONGO_URI")
 
 # ➤ Konekcija na MongoDB
@@ -25,7 +25,7 @@ collection = db["rezervacije"]
 def home():
     return "💅 Beauty Studio Renea Backend radi!"
 
-# ✅ Ruta za ping (za cron-job.org)
+# ✅ Ruta za ping
 @app.route("/ping")
 def ping():
     return "OK", 200
@@ -70,6 +70,13 @@ def rezerviraj():
 def get_rezervacije():
     rezervacije = list(collection.find({}, {"_id": 0}).sort("Termin"))
     return jsonify(rezervacije)
+
+# ✅ NOVO: Ruta za dohvat samo zauzetih termina
+@app.route("/api/zauzeti", methods=["GET"])
+def zauzeti_termini():
+    rezervacije = list(collection.find({}, {"_id": 0, "Termin": 1}))
+    zauzeti = [r["Termin"] for r in rezervacije if "Termin" in r]
+    return jsonify(zauzeti)
 
 # ✅ Pokretanje aplikacije lokalno
 if __name__ == "__main__":
