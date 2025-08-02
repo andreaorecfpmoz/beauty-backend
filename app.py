@@ -9,28 +9,28 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# ➤ Konfiguracija iz environment varijabli
-EMAIL_FROM = os.environ.get("EMAIL_FROM")
-EMAIL_PASS = os.environ.get("EMAIL_PASS")
-EMAIL_TO   = os.environ.get("EMAIL_TO")
-MONGO_URI  = os.environ.get("MONGO_URI")
+# ➤ Konfiguracija iz environment varijabli (za sigurnost)
+EMAIL_FROM = os.environ.get("EMAIL_FROM")  # npr. beautyrenea@gmail.com
+EMAIL_PASS = os.environ.get("EMAIL_PASS")  # Gmail App Password (App Password, ne obična lozinka)
+EMAIL_TO   = os.environ.get("EMAIL_TO")    # gdje šalješ obavijesti (isti ili drugi email)
+MONGO_URI  = os.environ.get("MONGO_URI")  # tvoja MongoDB konekcija
 
-# ➤ Konekcija na MongoDB
+# ➤ Konekcija na MongoDB Atlas
 client = MongoClient(MONGO_URI)
 db = client["beauty"]
 collection = db["rezervacije"]
 
-# ✅ Test ruta
+# Test ruta
 @app.route("/")
 def home():
     return "💅 Beauty Studio Renea Backend radi!"
 
-# ✅ Ruta za ping
+# Ping ruta (za npr. cron-job ping)
 @app.route("/ping")
 def ping():
     return "OK", 200
 
-# ✅ Ruta za unos rezervacije
+# Ruta za unos rezervacije
 @app.route("/rezerviraj", methods=["POST"])
 def rezerviraj():
     data = request.json
@@ -40,7 +40,7 @@ def rezerviraj():
     # Spremi u MongoDB
     collection.insert_one(data)
 
-    # Pripremi sadržaj e-maila
+    # Pripremi email sadržaj
     poruka = f"""
     📅 NOVA REZERVACIJA
 
@@ -65,20 +65,20 @@ def rezerviraj():
 
     return jsonify({"message": "Rezervacija spremljena i e-mail poslan!"}), 201
 
-# ✅ Ruta za dohvat svih rezervacija
+# Ruta za dohvat svih rezervacija (bez MongoDB _id polja)
 @app.route("/rezervacije", methods=["GET"])
 def get_rezervacije():
     rezervacije = list(collection.find({}, {"_id": 0}).sort("Termin"))
     return jsonify(rezervacije)
 
-# ✅ NOVO: Ruta za dohvat samo zauzetih termina
+# Ruta za dohvat samo zauzetih termina (za frontend da zna koje termine blokirati)
 @app.route("/api/zauzeti", methods=["GET"])
 def zauzeti_termini():
     rezervacije = list(collection.find({}, {"_id": 0, "Termin": 1}))
     zauzeti = [r["Termin"] for r in rezervacije if "Termin" in r]
     return jsonify(zauzeti)
 
-# ✅ Pokretanje aplikacije lokalno
+# Pokretanje Flask aplikacije lokalno
 if __name__ == "__main__":
     try:
         client.admin.command("ping")
