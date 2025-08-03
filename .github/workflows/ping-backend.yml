@@ -1,0 +1,13 @@
+name: Ping Render App
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Svakih 5 minuta
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl ping URL
+        run: curl -I https://beauty-backend-so65.onrender.com/ping
+
