@@ -21,6 +21,49 @@ client = MongoClient(MONGO_URI)
 db = client["beauty"]
 collection = db["rezervacije"]
 
+def posalji_mail_nova_rezervacija(data):
+    poruka = f"""
+    📅 NOVA REZERVACIJA
+
+    Ime i prezime: {data.get('Ime')}
+    Broj telefona: {data.get('Broj')}
+    Usluga: {data.get('Usluga')}
+    Termin: {data.get('Termin')}
+    """
+    msg = MIMEText(poruka)
+    msg["Subject"] = "💅 Nova rezervacija - Beauty Studio Renea"
+    msg["From"] = EMAIL_FROM
+    msg["To"] = EMAIL_TO
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_FROM, EMAIL_PASS)
+            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        print("✅ E-mail poslan (nova rezervacija).")
+    except Exception as e:
+        print("❌ Greška pri slanju e-maila:", e)
+
+def posalji_mail_otkazivanje(data):
+    poruka = f"""
+    ❌ REZERVACIJA OTKAZANA
+
+    Ime i prezime: {data.get('Ime')}
+    Broj telefona: {data.get('Broj')}
+    Usluga: {data.get('Usluga')}
+    Termin: {data.get('Termin')}
+    Vrijeme otkazivanja: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+    """
+    msg = MIMEText(poruka)
+    msg["Subject"] = "❌ Otkazana rezervacija - Beauty Studio Renea"
+    msg["From"] = EMAIL_FROM
+    msg["To"] = EMAIL_TO
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_FROM, EMAIL_PASS)
+            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        print("✅ E-mail poslan (otkazivanje).")
+    except Exception as e:
+        print("❌ Greška pri slanju e-maila za otkazivanje:", e)
+
 # Test ruta
 @app.route("/")
 def home():
@@ -45,28 +88,8 @@ def rezerviraj():
     # Spremi u MongoDB
     collection.insert_one(data)
 
-    # Pripremi email sadržaj
-    poruka = f"""
-    📅 NOVA REZERVACIJA
-
-    Ime i prezime: {data.get('Ime')}
-    Broj telefona: {data.get('Broj')}
-    Usluga: {data.get('Usluga')}
-    Termin: {data.get('Termin')}
-    """
-
-    msg = MIMEText(poruka)
-    msg["Subject"] = "💅 Nova rezervacija - Beauty Studio Renea"
-    msg["From"] = EMAIL_FROM
-    msg["To"] = EMAIL_TO
-
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(EMAIL_FROM, EMAIL_PASS)
-            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
-        print("✅ E-mail poslan.")
-    except Exception as e:
-        print("❌ Greška pri slanju e-maila:", e)
+    # Pošalji mail za novu rezervaciju
+    posalji_mail_nova_rezervacija(data)
 
     return jsonify({"message": "Rezervacija spremljena i e-mail poslan!"}), 201
 
@@ -119,6 +142,11 @@ def otkazi_rezervaciju():
         {"Broj": broj, "Termin": termin},
         {"$set": {"Status": "Otkazano"}}
     )
+
+    # Pošalji mail o otkazivanju (koristi podatke iz stare rezervacije)
+    rezervacija["Status"] = "Otkazano"
+    posalji_mail_otkazivanje(rezervacija)
+
     return jsonify({"message": "Rezervacija je otkazana!"}), 200
 
 # Ruta za dohvat samo zauzetih termina (za frontend da zna koje termine blokirati)
