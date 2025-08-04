@@ -4,6 +4,7 @@ from pymongo import MongoClient
 import smtplib
 from email.mime.text import MIMEText
 import os
+from datetime import datetime, timedelta
 
 # Inicijalizacija Flask aplikacije
 app = Flask(__name__)
@@ -37,6 +38,10 @@ def rezerviraj():
     if not data:
         return jsonify({"error": "Nema podataka"}), 400
 
+    # Dodaj status ako ga nema
+    if "Status" not in data:
+        data["Status"] = "Aktivno"
+
     # Spremi u MongoDB
     collection.insert_one(data)
 
@@ -65,11 +70,56 @@ def rezerviraj():
 
     return jsonify({"message": "Rezervacija spremljena i e-mail poslan!"}), 201
 
-# Ruta za dohvat svih rezervacija (bez MongoDB _id polja)
+# Ruta za dohvat svih rezervacija (za admin)
 @app.route("/rezervacije", methods=["GET"])
 def get_rezervacije():
     rezervacije = list(collection.find({}, {"_id": 0}).sort("Termin"))
     return jsonify(rezervacije)
+
+# ➤ NOVO: Ruta za dohvat rezervacija za određenog korisnika (po broju)
+@app.route("/rezervacije/korisnik", methods=["GET"])
+def rezervacije_korisnika():
+    broj = request.args.get("broj")
+    if not broj:
+        return jsonify({"error": "Nedostaje broj telefona."}), 400
+    rezervacije = list(collection.find({"Broj": broj}, {"_id": 0}).sort("Termin"))
+    return jsonify(rezervacije)
+
+# ➤ NOVO: Ruta za otkazivanje rezervacije (do 2 sata prije termina)
+@app.route("/rezervacije/otkazi", methods=["POST"])
+def otkazi_rezervaciju():
+    data = request.json
+    broj = data.get("broj")
+    termin = data.get("termin")  # ISO string
+
+    if not (broj and termin):
+        return jsonify({"error": "Nedostaje podatak."}), 400
+
+    rezervacija = collection.find_one({"Broj": broj, "Termin": termin})
+
+    if not rezervacija:
+        return jsonify({"error": "Rezervacija nije pronađena."}), 404
+
+    # Već otkazana?
+    if rezervacija.get("Status") == "Otkazano":
+        return jsonify({"error": "Rezervacija je već otkazana."}), 400
+
+    # Provjeri može li se otkazati (više od 2h prije termina)
+    try:
+        vrijeme_termina = datetime.fromisoformat(termin)
+    except Exception:
+        return jsonify({"error": "Nevažeći format termina."}), 400
+
+    sad = datetime.now()
+    if vrijeme_termina - sad < timedelta(hours=2):
+        return jsonify({"error": "Otkazivanje više nije moguće (manje od 2h do termina)."}), 403
+
+    # Otkazivanje: ažuriraj status na "Otkazano"
+    collection.update_one(
+        {"Broj": broj, "Termin": termin},
+        {"$set": {"Status": "Otkazano"}}
+    )
+    return jsonify({"message": "Rezervacija je otkazana!"}), 200
 
 # Ruta za dohvat samo zauzetih termina (za frontend da zna koje termine blokirati)
 @app.route("/api/zauzeti", methods=["GET"])
