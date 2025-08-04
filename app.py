@@ -21,15 +21,24 @@ client = MongoClient(MONGO_URI)
 db = client["beauty"]
 collection = db["rezervacije"]
 
-def posalji_mail_nova_rezervacija(data):
-    poruka = f"""
-    📅 NOVA REZERVACIJA
+def formatiraj_termin(termin_str):
+    """Vrati termin kao '05.08.2025. u 09:30' ili originalni string ako ne može parsirati"""
+    try:
+        termin_dt = datetime.fromisoformat(termin_str)
+        return termin_dt.strftime("%d.%m.%Y. u %H:%M")
+    except Exception:
+        return termin_str
 
-    Ime i prezime: {data.get('Ime')}
-    Broj telefona: {data.get('Broj')}
-    Usluga: {data.get('Usluga')}
-    Termin: {data.get('Termin')}
-    """
+def posalji_mail_nova_rezervacija(data):
+    termin_lijepo = formatiraj_termin(data.get('Termin'))
+    poruka = f"""
+📅 NOVA REZERVACIJA
+
+Ime i prezime: {data.get('Ime')}
+Broj telefona: {data.get('Broj')}
+Usluga: {data.get('Usluga')}
+Termin: {termin_lijepo}
+"""
     msg = MIMEText(poruka)
     msg["Subject"] = "💅 Nova rezervacija - Beauty Studio Renea"
     msg["From"] = EMAIL_FROM
@@ -43,15 +52,16 @@ def posalji_mail_nova_rezervacija(data):
         print("❌ Greška pri slanju e-maila:", e)
 
 def posalji_mail_otkazivanje(data):
+    termin_lijepo = formatiraj_termin(data.get('Termin'))
     poruka = f"""
-    ❌ REZERVACIJA OTKAZANA
+❌ REZERVACIJA OTKAZANA
 
-    Ime i prezime: {data.get('Ime')}
-    Broj telefona: {data.get('Broj')}
-    Usluga: {data.get('Usluga')}
-    Termin: {data.get('Termin')}
-    Vrijeme otkazivanja: {datetime.now().strftime('%d.%m.%Y %H:%M')}
-    """
+Ime i prezime: {data.get('Ime')}
+Broj telefona: {data.get('Broj')}
+Usluga: {data.get('Usluga')}
+Termin: {termin_lijepo}
+Vrijeme otkazivanja: {datetime.now().strftime('%d.%m.%Y. u %H:%M')}
+"""
     msg = MIMEText(poruka)
     msg["Subject"] = "❌ Otkazana rezervacija - Beauty Studio Renea"
     msg["From"] = EMAIL_FROM
